@@ -121,12 +121,19 @@ function renderCard(movie){
 
   const card = document.querySelector(".card");
 
-  card.querySelector("#title").textContent = movie.title;
-  card.querySelector("#runtime").textContent = `${movie.runtime}` + " minutes";
-  card.querySelector("#film-info").textContent = movie.description;
-  card.querySelector("#showtime").textContent = movie.showtime;
+  card.querySelector("#title").textContent      = movie.title;
+  card.querySelector("#runtime").textContent    = `${movie.runtime}` + " minutes";
+  card.querySelector("#film-info").textContent  = movie.description;
+  card.querySelector("#showtime").textContent   = movie.showtime;
   card.querySelector("#ticket-num").textContent = `${parseInt(movie.capacity, 10) - parseInt(movie.tickets_sold, 10)}`;
 
+  const buyTicket = document.querySelector("#buy-ticket");
+
+  if (movie.capacity !== movie.tickets_sold){
+    buyTicket.textContent = "Buy Ticket";
+  } else {
+    buyTicket.textContent = "Sold Out";
+  }
 }
 
 
