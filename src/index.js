@@ -42,6 +42,14 @@ function handleBuyTicket(event, movies){
   if (ticketNumInteger === 0){
     const buyTicket = document.querySelector("#buy-ticket");
     buyTicket.textContent = "Sold Out";
+    let movieTitles = document.querySelectorAll("#films li");
+    const currentlyRenderedTitle = document.querySelector("#title");
+
+    movieTitles = Array.from(movieTitles);  
+
+    const movieInSideMenu = movieTitles.find((movieTitle) => (movieTitle.textContent === currentlyRenderedTitle.textContent));
+
+    movieInSideMenu.classList.add("sold-out");
 
     return;
   }
@@ -129,6 +137,13 @@ function renderSideMenu(){
 
 
 
+// When a movie is sold out (when there are no available tickets remaining), indicate that the movie is sold out by changing the button text to "Sold Out". 
+// Also update the film item in the ul#films menu by adding a class of sold-out to the film. For reference, here's what the contents of the ul#films element should look 
+// like with a sold out film:
+
+// <li class="film item">(Title of film)</li>
+// <li class="sold-out film item">(Title of a sold-out film)</li>
+// <li class="film item">(Title of film)</div>
 
 
 
