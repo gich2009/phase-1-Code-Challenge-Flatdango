@@ -19,6 +19,8 @@ function main(){
 }
 
 
+
+
 /******************************************************/
 /* Functions that add event listeners to DOM elements */
 /******************************************************/
@@ -29,27 +31,27 @@ function addEventListenerOnBuyTicket(){
 
 
 
-
 /**************************************************/
 /* Function Handlers that act on triggered events */
 /**************************************************/
-//He needs the movies to check which of the movies he should format
 function handleBuyTicket(event, movies){
   const ticketNum = document.querySelector("#ticket-num");
   let ticketNumInteger = parseInt(ticketNum.textContent, 10);
 
-  //if No ticket remaining, return. change button text and return
+  let movieList = document.querySelectorAll("#films li");
+  const currentMovieTitle = document.querySelector("#title");
+
+  movieList = Array.from(movieList);  
+
+  //Find the current movie being rendered by comparing the currently rendered title with the list of movie titles in the side menu.
+  const movieCurrentlyRendered = movieList.find((movie) => (movie.textContent === currentMovieTitle.textContent));
+
+  //If no ticket remaining, return. change button text and return
   if (ticketNumInteger === 0){
     const buyTicket = document.querySelector("#buy-ticket");
     buyTicket.textContent = "Sold Out";
-    let movieTitles = document.querySelectorAll("#films li");
-    const currentlyRenderedTitle = document.querySelector("#title");
-
-    movieTitles = Array.from(movieTitles);  
-
-    const movieInSideMenu = movieTitles.find((movieTitle) => (movieTitle.textContent === currentlyRenderedTitle.textContent));
-
-    movieInSideMenu.classList.add("sold-out");
+    
+    movieCurrentlyRendered.classList.add("sold-out");
 
     return;
   }
@@ -57,24 +59,55 @@ function handleBuyTicket(event, movies){
   ticketNumInteger -= 1;
 
   ticketNum.textContent = `${ticketNumInteger}`;
+  movieCurrentlyRendered.dataset.tickets_sold = `${parseInt(movieCurrentlyRendered.dataset.tickets_sold, 10) + 1}`;
 
-  const movieTitle = document.querySelector("#title");
+  serverPatch(movieCurrentlyRendered);
+}
+
+
+//Deletes a movie and if it is the one being currently rendered, renders the one before it
+function handleDeleteMovie(event){
+  let currentId = event.target.dataset.id;
+
+  let movieList = document.querySelectorAll("ul#films > li");
+  movieList = Array.from(movieList);
+  console.log(movieList)
+
+  let deleteIndex = movieList.findIndex((movie) => movie.dataset.id === currentId);
+  let previousIndex = deleteIndex - 1;
+
+  //If it the first movie is to be deleted, then the previous movie is the one after it.
+  if (deleteIndex === 0){
+    previousIndex = deleteIndex + 1; 
+  }
+  
+  let movieToDelete = movieList[deleteIndex]
+
+  console.log(movieToDelete);
+  
+  const movieBeforeMovieToDelete = movieList[previousIndex];
+  console.log(movieBeforeMovieToDelete);
+
+  const previousMovie = constructMovie(movieBeforeMovieToDelete);
+
+  const currentMovieTitle = document.querySelector("#title");
+
+  if (currentMovieTitle.textContent === movieToDelete.textContent){
+    renderCard(previousMovie);
+  }
+
+
+  movieToDelete.remove();
+  event.target.remove();
+
+  serverDelete(currentId);
 }
 
 
 function handleSideMenu(event){
-
-  const destinationURL = baseURL + basePath;
-
-  fetch(destinationURL, {method: "GET"}).then((response) => response.json()).then((movies) => {
-    const movie = movies.find((movie) => ("film" + movie.id) === event.target.id);
-    console.log(movie);
-
-    if (movie !== -1){
-      renderCard(movie);
-    }
-  })
+  renderCard(constructMovie(event.target));
 }
+
 
 
 
@@ -82,10 +115,9 @@ function handleSideMenu(event){
 /* Functions that render the information by DOM manipulation */
 /*************************************************************/
 function renderCard(movie){
-  const poster = document.querySelector("#poster");
+  let poster = document.querySelector("#poster");
   poster.src = movie.poster;
   poster.alt = movie.title;
-
 
   const card = document.querySelector(".card");
 
@@ -94,6 +126,7 @@ function renderCard(movie){
   card.querySelector("#film-info").textContent = movie.description;
   card.querySelector("#showtime").textContent = movie.showtime;
   card.querySelector("#ticket-num").textContent = `${parseInt(movie.capacity, 10) - parseInt(movie.tickets_sold, 10)}`;
+
 }
 
 
@@ -101,25 +134,44 @@ function renderMovieInSideMenu(movie){
   const movieTitle = document.createElement("li");
   movieTitle.classList.add("film");
   movieTitle.classList.add("item");
-  const padding = "film";
-  movieTitle.id = padding +`${movie.id}`;
+  movieTitle.id = "li" + `${movie.id}`;
+  
+  //Cache all the data of the movie from the server database in the dataset attribute(data-*) of the new movie list element.
+  //An alternative way to do this would be to create a single object to hold all the data in the dataset attribute, but for simplicity,
+  //all the data properties were stored in different variables in the dataset attribute.
+  movieTitle.dataset.capacity = movie.capacity;
+  movieTitle.dataset.tickets_sold = movie.tickets_sold;
+  movieTitle.dataset.id = movie.id;
+  movieTitle.dataset.runtime = movie.runtime;
+  movieTitle.dataset.showtime = movie.showtime;
+  movieTitle.dataset.description = movie.description;
+  movieTitle.dataset.poster = movie.poster;
 
-  //Ane event listener to the li element is added here instead of adding it in the addEventListeners section.
+
+  //An event listener to the li element is added here instead of adding it in the addEventListeners section.
   movieTitle.addEventListener("click", handleSideMenu);
 
   movieTitle.textContent = movie.title;
 
+  const deleteButton = document.createElement("button");
+  deleteButton.textContent = "X";
+  deleteButton.addEventListener("click", handleDeleteMovie);
+  deleteButton.dataset.id = movie.id;
+
   document.querySelector("#films").appendChild(movieTitle);
+  document.querySelector("#films").appendChild(deleteButton);
 }
+
+
 
 
 /***************************************************/
 /*   Functions that communicate with the server.   */
 /***************************************************/
-async function renderHomePage(){
-
+function renderHomePage(){
   const destinationURL = baseURL + basePath + homePage;
-  return fetch(destinationURL, {method: "GET"}).then((response) => response.json()).then((movie) => {
+
+  fetch(destinationURL, {method: "GET"}).then((response) => response.json()).then((movie) => {
     renderCard(movie);
   })
 
@@ -127,8 +179,8 @@ async function renderHomePage(){
 
 
 function renderSideMenu(){
-
   const destinationURL = baseURL + basePath;
+
   fetch(destinationURL, {method: "GET"}).then((response) => response.json()).then((movies) => {
     movies.forEach((movie) => renderMovieInSideMenu(movie));
   })
@@ -136,225 +188,52 @@ function renderSideMenu(){
 }
 
 
+function serverPatch(movieList){
+  const movie = {
+    tickets_sold: movieList.dataset.tickets_sold
+  }
 
-// When a movie is sold out (when there are no available tickets remaining), indicate that the movie is sold out by changing the button text to "Sold Out". 
-// Also update the film item in the ul#films menu by adding a class of sold-out to the film. For reference, here's what the contents of the ul#films element should look 
-// like with a sold out film:
-
-// <li class="film item">(Title of film)</li>
-// <li class="sold-out film item">(Title of a sold-out film)</li>
-// <li class="film item">(Title of film)</div>
-
-
-
-
-// function addEventListenersToSideMenu(){
-//   let movieTitles = document.querySelectorAll("li#film1.film.item");
-//   console.log(movieTitles);
-//   movieTitles = Array.from(movieTitles.childNodes);
-//   console.log(movieTitles);
-//   // movieTitles.forEach((movieTitle) => movieTitle.addEventListener("click", () => console.log("hi")));
-
-
+  const destinationURL = baseURL + basePath;
   
-
-//   // movieTitles.forEach((movieTitle) => movieTitle.addEventListener("click", () => console.log("hi")));
-// }
-
-// function addEventListenerOnForm(){
-//   document.querySelector("#dog-form").addEventListener("submit", submitHandler);
-// }
-
-
-
-
-
-
-//  let configurePage = new Promise(function(myResolve, myReject){
-//     myResolve(renderHomePage());
-//   });
-
-//   configurePage.then(function (value){
-//     console.log("are you here?");
-//     addEventListenersToSideMenu();
-//   });
-
-//   renderSideMenu();
-//   addEventListenerOnBuyTicket();
-
-
-
-
-
-
-
-
-// function editHandler(dog){
-//   const form = document.querySelector("#dog-form");
-
-//   form.name.value  = dog.name;   
-//   form.breed.value = dog.breed; 
-//   form.sex.value   = dog.sex;     
-//   form.dataset.id  = dog.id;
-//   console.log("Data entry id: ", form.dataset.id);
-// }
-
-
-// function submitHandler(event){
-//    event.preventDefault();
-
-//    console.log(event.target.dataset.id)
-//     if (event.target.dataset.id){
-//       let dog = {
-//         id : event.target.dataset.id,
-//         name: event.target.name.value,
-//         breed: event.target.breed.value,
-//         sex: event.target.sex.value
-//       };
-
-//       patchServer(dog);
-//       const recordToUpdate = document.querySelector(`#singleRecord${dog.id}`);
-//       recordToUpdate.querySelector(`#td1${dog.id}`).textContent = dog.name;
-//       recordToUpdate.querySelector(`#td2${dog.id}`).textContent = dog.breed;
-//       recordToUpdate.querySelector(`#td3${dog.id}`).textContent = dog.sex;
-      
-//     } else {
-//       let dog = {
-//         name: event.target.name.value,
-//         breed: event.target.breed.value,
-//         sex: event.target.sex.value
-//       };
-
-//       updateServer(dog);
-//       renderOneDog(dog);
-//     }
-//   }
-
-
-
-
-
-
-
-
-
-
-
-// function renderPage(){
-
-//   const destinationURL = baseURL + basePath;
-//   fetch(destinationURL, {method: "GET"}).then((response) => response.json()).then((dogs) => {
-//     dogs.forEach((dog) => renderOneDog(dog));
-//     globalDogs = dogs;
-//   })
-
-// }
-
-
-// function updateServer(dog){
-
-//   const destinationURL = baseURL + basePath;
-  
-//   fetch(destinationURL, {
-//     method: "POST",
-//     headers: {"Content-Type": "application/json",
-//               "Accept": "application/json"
-//              },
-//     body: JSON.stringify(dog) 
-//   })
-//   .then((response) => response.json()).then((dog) => {
-//     console.log(dog);
-//   })
-//   .catch((error) => console.error(error));
-// }
-
-
-// function patchServer(dog){
-//   const destinationURL = baseURL + basePath;
-  
-//   fetch(destinationURL + `/${dog.id}`, {
-//     method: "PATCH",
-//     headers: {"Content-Type": "application/json",
-//               "Accept": "application/json"
-//              },
-//     body: JSON.stringify(dog) 
-//   })
-//   .then((response) => response.json()).then((dog) => {
-//     console.log(dog);
-//   })
-//   .catch((error) => console.error(error));
-// }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// function renderOneDog(dog){
-//   let singleRecord = document.createElement("tr");
-
-//   let editButtonTableData = document.createElement("td");
-//   let editButton = document.createElement("button");
-//   editButton.textContent = "Edit";
-//   editButton.id = dog["id"];
-
-//   editButton.addEventListener("click", () => editHandler(dog));
-
-//   editButtonTableData.appendChild(editButton);
-
-//   singleRecord.innerHTML = `
-//                              <td id="td1${dog.id}">${dog["name"]}</td>
-//                              <td id="td2${dog.id}">${dog["breed"]}</td>
-//                              <td id="td3${dog.id}">${dog["sex"]}</td>
-//                            `
-//   singleRecord.id = `singleRecord${dog["id"]}`;
-//   singleRecord.appendChild(editButtonTableData);
-
-
-//   document.querySelector("#table-body").appendChild(singleRecord);
-// }
-
-
-
-// let editButtonTableData = document.createElement("td");
-//   let editButton = document.createElement("button");
-//   editButton.textContent = "Edit";
-//   editButton.id = dog["id"];
-
-//   editButton.addEventListener("click", () => editHandler(dog));
-
-//   editButtonTableData.appendChild(editButton);
-
-//   singleRecord.innerHTML = `
-//                              <td id="td1${dog.id}">${dog["name"]}</td>
-//                              <td id="td2${dog.id}">${dog["breed"]}</td>
-//                              <td id="td3${dog.id}">${dog["sex"]}</td>
-//                            `
-//   singleRecord.id = `singleRecord${dog["id"]}`;
-//   singleRecord.appendChild(editButtonTableData);
-
-
-//   document.querySelector("#table-body").appendChild(singleRecord);
+  fetch(destinationURL + `/${movieList.dataset.id}`, {
+    method: "PATCH",
+    headers: {"Content-Type": "application/json",
+              "Accept": "application/json"
+             },
+    body: JSON.stringify(movie) 
+  })
+  .then((response) => response.json()).then((movie) => {
+    console.log(movie);
+  })
+  .catch((error) => console.error(error));
+}
+
+
+function serverDelete(id){
+  const destinationURL = baseURL + basePath + "/" + id;
+
+  fetch(destinationURL, {method: "DELETE"}).then((response) => response.json()).then((movie) => {
+     console.log(movie);
+  })
+}
+
+
+
+
+/*************************************************************/
+/*         Functions that reduce code redundancy             */
+/*************************************************************/
+function constructMovie(movieInList){
+  const movie = {
+    id:           movieInList.dataset.id,
+    title:        movieInList.textContent,
+    runtime:      movieInList.dataset.runtime,
+    capacity:     movieInList.dataset.capacity,
+    showtime:     movieInList.dataset.showtime,
+    tickets_sold: movieInList.dataset.tickets_sold,
+    description:  movieInList.dataset.description,
+    poster:       movieInList.dataset.poster
+  }
+
+  return movie;
+}
