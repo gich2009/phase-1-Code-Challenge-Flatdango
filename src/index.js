@@ -46,7 +46,7 @@ function handleBuyTicket(event, movies){
   //Find the current movie being rendered by comparing the currently rendered title with the list of movie titles in the side menu.
   const movieCurrentlyRendered = movieList.find((movie) => (movie.textContent === currentMovieTitle.textContent));
 
-  //If no ticket remaining, return. change button text and return
+  //If no ticket remaining, change button text and return.
   if (ticketNumInteger === 0){
     const buyTicket = document.querySelector("#buy-ticket");
     buyTicket.textContent = "Sold Out";
@@ -81,12 +81,9 @@ function handleDeleteMovie(event){
     previousIndex = deleteIndex + 1; 
   }
   
-  let movieToDelete = movieList[deleteIndex]
-
-  console.log(movieToDelete);
+  let movieToDelete = movieList[deleteIndex];
   
   const movieBeforeMovieToDelete = movieList[previousIndex];
-  console.log(movieBeforeMovieToDelete);
 
   const previousMovie = constructMovie(movieBeforeMovieToDelete);
 
